@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地理数据综合展示系统 - 登录</title>
+    <link href='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css' rel='stylesheet'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .login-container:hover {
+            transform: translateY(-5px);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            color: #1a2a6c;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #1a2a6c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-input {
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #3498db;
+        }
+
+        .login-btn {
+            background: linear-gradient(to right, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .form-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .form-footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+            font-size: 0.9rem;
+        }
+
+        .demo-accounts {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 0.85rem;
+        }
+
+        .demo-accounts h3 {
+            color: #1a2a6c;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .demo-account {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .demo-account:last-child {
+            border-bottom: none;
+        }
+
+        .map-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.1;
+        }
+    </style>
+</head>
+<body>
+    <!-- 简化版地图背景 -->
+    <div id="map-bg" class="map-bg"></div>
+
+    <div class="login-container">
+        <div class="login-header">
+            <h1><i class="fas fa-map-marked-alt"></i>地理数据综合展示系统</h1>
+            <p>请输入您的凭据以访问系统</p>
+        </div>
+
+        <form class="login-form" id="loginForm">
+            <div class="form-group">
+                <label for="username"><i class="fas fa-user"></i>用户名</label>
+                <input type="text" id="username" class="form-input" placeholder="请输入用户名" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i>密码</label>
+                <input type="password" id="password" class="form-input" placeholder="请输入密码" required>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <i class="fas fa-exclamation-circle"></i> 用户名或密码错误，请重试
+            </div>
+
+            <button type="submit" class="login-btn">
+                <i class="fas fa-sign-in-alt"></i> 登录系统
+            </button>
+        </form>
+
+        <div class="demo-accounts">
+            <h3><i class="fas fa-info-circle"></i>演示账户</h3>
+            <div class="demo-account">
+                <span>管理员:</span>
+                <span>admin / admin123</span>
+            </div>
+            <div class="demo-account">
+                <span>普通用户:</span>
+                <span>user / user123</span>
+            </div>
+            <div class="demo-account">
+                <span>访客:</span>
+                <span>guest / guest123</span>
+            </div>
+        </div>
+
+        <div class="form-footer">
+            <p>忘记密码？<a href="#">点击重置</a></p>
+        </div>
+    </div>
+
+    <script src='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js'></script>
+    <script>
+        // 初始化简化版地图背景
+        const map = new maplibregl.Map({
+            container: 'map-bg',
+            style: {
+                version: 8,
+                sources: {
+                    'osm': {
+                        type: 'raster',
+                        tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                        tileSize: 256
+                    }
+                },
+                layers: [{
+                    id: 'osm',
+                    type: 'raster',
+                    source: 'osm'
+                }]
+            },
+            center: [116.3974, 39.9093],
+            zoom: 3,
+            interactive: false // 禁用交互
+        });
+
+        // 登录表单处理
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('errorMessage');
+
+            // 简单的用户验证（实际应用中应连接后端API）
+            const validUsers = {
+                'admin': 'admin123',
+                'user': 'user123',
+                'guest': 'guest123'
+            };
+
+            if (validUsers[username] && validUsers[username] === password) {
+                // 登录成功，保存用户信息到sessionStorage
+                sessionStorage.setItem('loggedIn', 'true');
+                sessionStorage.setItem('username', username);
+
+                // 跳转到主系统页面
+                window.location.href = 'main-system.html'; // 替换为您的系统页面文件名
+            } else {
+                // 登录失败，显示错误信息
+                errorMessage.style.display = 'block';
+            }
+        });
+
+        // 清除错误信息当用户开始输入
+        document.getElementById('username').addEventListener('input', function() {
+            document.getElementById('errorMessage').style.display = 'none';
+        });
+
+        document.getElementById('password').addEventListener('input', function() {
+            document.getElementById('errorMessage').style.display = 'none';
+        });
+    </script>
+</body>
+</html>
