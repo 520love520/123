@@ -1,0 +1,2437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地理数据综合展示系统 - MVT版本</title>
+    <script src='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css' rel='stylesheet'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            overflow: hidden;
+        }
+
+        #app-container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            width: 350px;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: transform 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .control-panel:hover {
+            transform: translateY(-5px);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .panel-header h2 {
+            color: #1a2a6c;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-header i {
+            color: #3498db;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group h3 {
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            color: #1a2a6c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .search-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .search-header h3 {
+            font-size: 1.1rem;
+            color: #1a2a6c;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #3498db;
+        }
+
+        .search-btn {
+            background: linear-gradient(to right, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .search-results {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #555;
+        }
+
+        .search-results.highlight {
+            color: #3498db;
+            font-weight: 600;
+        }
+
+        .search-clear {
+            background: #f8f9fa;
+            color: #555;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .search-clear:hover {
+            background: #e9ecef;
+        }
+
+        .stats-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stats-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .stats-header h3 {
+            font-size: 1.1rem;
+            color: #1a2a6c;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stats-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .stats-controls .btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+
+        .stats-results {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            min-height: 60px;
+        }
+
+        .stats-results p {
+            margin: 0;
+            color: #666;
+        }
+
+        .stats-highlight {
+            color: #1a2a6c;
+            font-weight: 600;
+        }
+
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .stats-table th, .stats-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stats-table th {
+            background-color: #f8f9fa;
+            color: #1a2a6c;
+            font-weight: 600;
+        }
+
+        .stats-table tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        #chart-container {
+            height: 300px;
+            display: none;
+            margin-top: 15px;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #3498db;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .slider-control {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .slider-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 500;
+        }
+
+        .slider-value {
+            color: #3498db;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, #3498db, #2980b9);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(to right, #f39c12, #e67e22);
+            color: #333;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            width: 300px;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .info-panel h3 {
+            color: #1a2a6c;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-content {
+            line-height: 1.6;
+            color: #555;
+        }
+
+        .info-content p {
+            margin-bottom: 8px;
+        }
+
+        .logo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 20px;
+            border-radius: 50px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            color: #1a2a6c;
+            background: linear-gradient(to right, #1a2a6c, #3498db);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 700;
+        }
+
+        .logo i {
+            color: #3498db;
+            font-size: 1.8rem;
+        }
+
+        .map-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(26, 42, 108, 0.2), rgba(52, 152, 219, 0.1));
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .status-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .feature-counter {
+            background: rgba(26, 42, 108, 0.8);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(5px);
+        }
+
+        .loading-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-weight: 600;
+            color: #1a2a6c;
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(26, 42, 108, 0.3);
+            border-radius: 50%;
+            border-top-color: #1a2a6c;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .maplibregl-popup-content {
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            max-width: 300px;
+        }
+
+        .popup-content h3 {
+            color: #1a2a6c;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .popup-content ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .popup-content li {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .popup-content li strong {
+            color: #1a2a6c;
+        }
+
+        .legend-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 340px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            width: 220px;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .legend-panel h3 {
+            color: #1a2a6c;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .legend-label {
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .legend-line {
+            height: 3px;
+            width: 24px;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+
+        .color-picker-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding: 5px;
+        }
+
+        .color-picker-label {
+            font-size: 0.9rem;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-picker {
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: none;
+            padding: 0;
+        }
+
+        .color-picker::-webkit-color-swatch {
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        .color-picker::-moz-color-swatch {
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        #highlight-legend .legend-item:hover {
+            background-color: #f0f0f0 !important;
+        }
+
+        #highlight-legend .legend-item.active {
+            background-color: #e3f2fd !important;
+            border-left: 3px solid #2196f3;
+        }
+
+        .highlight-note {
+            font-size: 14px;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+
+        .analysis-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .analysis-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .analysis-tab.active {
+            border-bottom: 3px solid #3498db;
+            color: #3498db;
+            font-weight: 600;
+        }
+
+        .analysis-tab:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div class="logo">
+            <i class="fas fa-map-marked-alt"></i>
+            <h1>地理数据综合展示系统</h1>
+        </div>
+
+        <div class="control-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-sliders-h"></i>图层控制面板</h2>
+            </div>
+
+            <!-- 搜索组件 -->
+            <div class="search-container">
+                <div class="search-header">
+                    <h3><i class="fas fa-search"></i>道路搜索</h3>
+                </div>
+                <div class="search-input-group">
+                    <input type="text" id="search-input" class="search-input" placeholder="输入道路ref字段(如:G201)">
+                    <button id="search-btn" class="search-btn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div class="search-results" id="search-results">
+                    输入道路ref字段进行搜索
+                </div>
+                <button id="clear-search" class="search-clear">
+                    <i class="fas fa-times"></i>清除搜索
+                </button>
+            </div>
+
+            <!-- 统计分析面板 -->
+            <div class="stats-container">
+                <div class="stats-header">
+                    <h3><i class="fas fa-chart-bar"></i>道路统计分析</h3>
+                </div>
+
+                <!-- 分析类型选项卡 -->
+                <div class="analysis-tabs">
+                    <div class="analysis-tab active" data-type="oneway">单行道</div>
+                    <div class="analysis-tab" data-type="bridge">桥梁</div>
+                    <div class="analysis-tab" data-type="tunnel">隧道</div>
+                </div>
+
+                <div class="stats-controls">
+                    <button class="btn btn-primary" id="analyze-data">
+                        <i class="fas fa-chart-pie"></i>统计分析
+                    </button>
+                    <button class="btn btn-secondary" id="reset-stats">
+                        <i class="fas fa-redo"></i>重置统计
+                    </button>
+                </div>
+                <div class="stats-results" id="stats-results">
+                    <p>选择分析类型后点击"统计分析"按钮分析当前视图内的道路数据</p>
+                </div>
+                <!-- ECharts图表容器 -->
+                <div id="chart-container"></div>
+            </div>
+
+            <div class="control-group">
+                <h3><i class="fas fa-layer-group"></i>图层显示控制</h3>
+                <div class="toggle-container">
+                    <div class="toggle-label">
+                        <i class="fas fa-vector-square"></i>
+                        <span>面图层显示</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-layer" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="color-picker-container">
+                    <span class="color-picker-label"><i class="fas fa-palette"></i>面图层颜色</span>
+                    <input type="color" id="polygon-color" class="color-picker" value="#1a2a6c">
+                </div>
+
+                <div class="toggle-container">
+                    <div class="toggle-label">
+                        <i class="fas fa-water"></i>
+                        <span>水系图层显示</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-water-layer" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="color-picker-container">
+                    <span class="color-picker-label"><i class="fas fa-palette"></i>水系颜色</span>
+                    <input type="color" id="water-color" class="color-picker" value="#1e88e5">
+                </div>
+
+                <div class="toggle-container">
+                    <div class="toggle-label">
+                        <i class="fas fa-road"></i>
+                        <span>道路图层显示</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-roads-layer" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="color-picker-container">
+                    <span class="color-picker-label"><i class="fas fa-palette"></i>道路颜色</span>
+                    <input type="color" id="roads-color" class="color-picker" value="#ffd600">
+                </div>
+
+                <div class="toggle-container">
+                    <div class="toggle-label">
+                        <i class="fas fa-train"></i>
+                        <span>铁路图层显示</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-railways-layer" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="color-picker-container">
+                    <span class="color-picker-label"><i class="fas fa-palette"></i>铁路颜色</span>
+                    <input type="color" id="railways-color" class="color-picker" value="#000000">
+                </div>
+                 <div class="toggle-container">
+                    <div class="toggle-label">
+                        <i class="fas fa-map-pin"></i>
+                        <span>点状数据图层显示</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-places-layer" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="color-picker-container">
+                    <span class="color-picker-label"><i class="fas fa-palette"></i>点状数据颜色</span>
+                    <input type="color" id="places-color" class="color-picker" value="#e91e63">
+                </div>
+                <!-- 缓冲区分析控件 -->
+<div class="buffer-analysis-container">
+    <div class="buffer-header">
+        <h3><i class="fas fa-bullseye"></i>缓冲区分析</h3>
+    </div>
+
+    <div class="buffer-controls">
+        <div class="buffer-input-group">
+            <input type="number" id="buffer-radius" class="buffer-input"
+                   placeholder="缓冲区半径(米)" min="100" max="10000" value="1000">
+            <button id="create-buffer" class="buffer-btn">
+                <i class="fas fa-draw-polygon"></i>创建缓冲区
+            </button>
+        </div>
+        <div class="buffer-input-group">
+            <button id="clear-buffer" class="buffer-btn secondary">
+                <i class="fas fa-trash"></i>清除缓冲区
+            </button>
+        </div>
+    </div>
+
+    <div class="buffer-results" id="buffer-results">
+        <p>点击点要素后点击"创建缓冲区"按钮</p>
+    </div>
+</div>
+            </div>
+
+            <div class="control-group">
+                <h3><i class="fas fa-expand-alt"></i>样式与缩放控制</h3>
+                <div class="slider-control">
+                    <div class="slider-item">
+                        <div class="slider-header">
+                            <span><i class="fas fa-palette"></i>面填充透明度</span>
+                            <span class="slider-value" id="fill-opacity-value">0.7</span>
+                        </div>
+                        <input type="range" id="fill-opacity" min="0.1" max="1" step="0.1" value="0.7">
+                    </div>
+                    <div class="slider-item">
+                        <div class="slider-header">
+                            <span><i class="fas fa-tint"></i>水系透明度</span>
+                            <span class="slider-value" id="water-opacity-value">0.8</span>
+                        </div>
+                        <input type="range" id="water-opacity" min="0.1" max="1" step="0.1" value="0.8">
+                    </div>
+                    <div class="slider-item">
+                        <div class="slider-header">
+                            <span><i class="fas fa-road"></i>道路透明度</span>
+                            <span class="slider-value" id="roads-opacity-value">0.9</span>
+                        </div>
+                        <input type="range" id="roads-opacity" min="0.1" max="1" step="0.1" value="0.9">
+                    </div>
+                    <div class="slider-item">
+                        <div class="slider-header">
+                            <span><i class="fas fa-map-pin"></i>点状数据透明度</span>
+                            <span class="slider-value" id="places-opacity-value">0.9</span>
+                        </div>
+                        <input type="range" id="places-opacity" min="0.1" max="1" step="0.1" value="0.9">
+                    </div>
+                    <div class="slider-item">
+                        <div class="slider-header">
+                            <span><i class="fas fa-train"></i>铁路透明度</span>
+                            <span class="slider-value" id="railways-opacity-value">0.9</span>
+                        </div>
+                        <input type="range" id="railways-opacity" min="0.1" max="1" step="0.1" value="0.9">
+                    </div>
+                    <div class="slider-item">
+                        <div class="slider-header">
+                            <span><i class="fas fa-search"></i>地图缩放</span>
+                            <span class="slider-value" id="zoom-level-value">10</span>
+                        </div>
+                        <input type="range" id="zoom-level" min="5" max="18" step="0.1" value="10">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="reset-view">
+                    <i class="fas fa-home"></i>重置视图
+                </button>
+                <button class="btn btn-secondary" id="export-map">
+                    <i class="fas fa-download"></i>导出图片
+                </button>
+            </div>
+
+            <!-- 高亮图例 -->
+            <div id="highlight-legend" style="display: none; margin-top: 20px;"></div>
+        </div>
+
+        <div class="info-panel">
+            <h3><i class="fas fa-info-circle"></i>系统信息</h3>
+            <div class="info-content">
+                <p><strong>数据源:</strong> OpenstreetMap</p>
+                <p><strong>图层:</strong> 道路、水系、铁路、地点</p>
+                <p><strong>功能:</strong> 搜索、统计、可视化、缓冲区分析</p>
+                <p><strong>版本:</strong> 2.0.0</p>
+            </div>
+        </div>
+
+        <div class="legend-panel">
+            <h3><i class="fas fa-map"></i>图例</h3>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #1a2a6c;"></div>
+                <div class="legend-label">面数据</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #1e88e5;"></div>
+                <div class="legend-label">水系</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-line" style="background-color: #ffd600;"></div>
+                <div class="legend-label">道路</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-line" style="background-color: #000000;"></div>
+                <div class="legend-label">铁路</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-point" style="background-color: #e91e63;"></div>
+                <div class="legend-label">点状数据</div>
+            </div>
+        </div>
+
+        <div id="map"></div>
+        <div class="map-overlay"></div>
+
+        <div class="feature-counter">
+            <i class="fas fa-layer-group"></i>
+            <span id="feature-count">加载中...</span>
+        </div>
+
+        <div class="status-bar">
+            <span>地理数据综合展示系统</span>
+            <span id="coordinates">经度: 0, 纬度: 0</span>
+        </div>
+
+        <div class="loading-indicator" id="loading-indicator">
+            <div class="loading-spinner"></div>
+            <span>地图加载中...</span>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let map;
+        let chart;
+        let currentHighlightLayer = null;
+        let currentAnalysisType = 'oneway'; // 当前分析类型
+        let mvtSourceAdded = false;
+
+        // 初始化地图
+        function initMap() {
+            // 隐藏加载指示器
+            document.getElementById('loading-indicator').style.display = 'none';
+
+            // 创建地图实例
+            map = new maplibregl.Map({
+                container: 'map',
+                style: {
+                    version: 8,
+                    sources: {
+                        'osm': {
+                            type: 'raster',
+                            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                            tileSize: 256,
+                            attribution: '© OpenStreetMap contributors'
+                        }
+                    },
+                    layers: [{
+                        id: 'osm',
+                        type: 'raster',
+                        source: 'osm',
+                        minzoom: 0,
+                        maxzoom: 22
+                    }]
+                },
+                center: [116.3974, 39.9093], // 北京中心
+                zoom: 10,
+                pitch: 0,
+                bearing: 0
+            });
+
+            // 添加导航控件
+            map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+            // 添加比例尺
+            map.addControl(new maplibregl.ScaleControl({
+                maxWidth: 100,
+                unit: 'metric'
+            }), 'bottom-left');
+
+            // 添加MVT图层
+            map.on('load', function() {
+                const loadingIndicator = document.getElementById('loading-indicator');
+
+                // 添加面数据MVT矢量瓦片源
+                map.addSource('polygon-mvt', {
+                    type: 'vector',
+                    tiles: [
+                        'http://localhost:8080/geoserver/gwc/service/wmts?layer=ne:china1&style=&tilematrixset=EPSG:900913&Service=WMTS&Request=GetTile&Version=1.0.0&Format=application/vnd.mapbox-vector-tile&TileMatrix=EPSG:900913:{z}&TileCol={x}&TileRow={y}'
+                    ],
+                    minzoom: 0,
+                    maxzoom: 14
+                });
+
+                // 添加水系数据MVT矢量瓦片源
+                map.addSource('water-mvt', {
+                    type: 'vector',
+                    tiles: [
+                        'http://localhost:8080/geoserver/gwc/service/wmts?layer=ne:water&style=&tilematrixset=EPSG:900913&Service=WMTS&Request=GetTile&Version=1.0.0&Format=application/vnd.mapbox-vector-tile&TileMatrix=EPSG:900913:{z}&TileCol={x}&TileRow={y}'
+                    ],
+                    minzoom: 0,
+                    maxzoom: 14
+                });
+
+                // 添加道路数据MVT矢量瓦片源
+                map.addSource('roads-mvt', {
+                    type: 'vector',
+                    tiles: [
+                        'http://localhost:8080/geoserver/gwc/service/wmts?layer=ne:roads&style=&tilematrixset=EPSG:900913&Service=WMTS&Request=GetTile&Version=1.0.0&Format=application/vnd.mapbox-vector-tile&TileMatrix=EPSG:900913:{z}&TileCol={x}&TileRow={y}'
+                    ],
+                    minzoom: 0,
+                    maxzoom: 14
+                });
+
+                // 添加铁路数据MVT矢量瓦片源
+                map.addSource('railways-mvt', {
+                    type: 'vector',
+                    tiles: [
+                        'http://localhost:8080/geoserver/gwc/service/wmts?layer=ne:railways&style=&tilematrixset=EPSG:900913&Service=WMTS&Request=GetTile&Version=1.0.0&Format=application/vnd.mapbox-vector-tile&TileMatrix=EPSG:900913:{z}&TileCol={x}&TileRow={y}'
+                    ],
+                    minzoom: 0,
+                    maxzoom: 14
+                });
+                  // 新增：添加点状数据MVT矢量瓦片源
+            map.addSource('places-mvt', {
+                type: 'vector',
+                tiles: [
+                    'http://localhost:8080/geoserver/gwc/service/wmts?layer=ne:places&style=&tilematrixset=EPSG:900913&Service=WMTS&Request=GetTile&Version=1.0.0&Format=application/vnd.mapbox-vector-tile&TileMatrix=EPSG:900913:{z}&TileCol={x}&TileRow={y}'
+                ],
+                minzoom: 0,
+                maxzoom: 14
+            });
+
+                // 添加面数据图层
+                map.addLayer({
+                    id: 'polygon-mvt-layer',
+                    type: 'fill',
+                    source: 'polygon-mvt',
+                    'source-layer': 'china1',
+                    paint: {
+                        'fill-color': '#1a2a6c',
+                        'fill-opacity': 0.7,
+                        'fill-outline-color': '#000000'
+                    }
+                });
+
+                // 添加水系图层
+                map.addLayer({
+                    id: 'water-mvt-layer',
+                    type: 'fill',
+                    source: 'water-mvt',
+                    'source-layer': 'water',
+                    paint: {
+                        'fill-color': '#1e88e5',
+                        'fill-opacity': 0.8
+                    }
+                }, 'polygon-mvt-layer');
+
+                // 添加道路图层
+                map.addLayer({
+                    id: 'roads-mvt-layer',
+                    type: 'line',
+                    source: 'roads-mvt',
+                    'source-layer': 'roads',
+                    paint: {
+                        'line-color': '#ffd600',
+                        'line-width': 2,
+                        'line-opacity': 0.9
+                    }
+                }, 'water-mvt-layer');
+
+                // 添加铁路图层
+                map.addLayer({
+                    id: 'railways-mvt-layer',
+                    type: 'line',
+                    source: 'railways-mvt',
+                    'source-layer': 'railways',
+                    paint: {
+                        'line-color': '#000000',
+                        'line-width': 3,
+                        'line-opacity': 0.9,
+                        'line-dasharray': [2, 2]
+                    }
+                }, 'roads-mvt-layer');
+
+
+                mvtSourceAdded = true;
+
+                // 隐藏加载指示器
+                setTimeout(() => {
+                    loadingIndicator.style.display = 'none';
+                }, 1500);
+
+                // 更新要素计数
+                document.getElementById('feature-count').textContent = 'MVT瓦片';
+
+                // 添加面图层交互功能
+                map.on('click', 'polygon-mvt-layer', function(e) {
+                    if (!e.features || e.features.length === 0) return;
+
+                    const feature = e.features[0];
+                    const properties = feature.properties;
+
+                    // 创建弹出窗口内容
+                    let popupContent = '<div class="popup-content"><h3>面要素信息</h3><ul>';
+
+                    for (const key in properties) {
+                        if (properties.hasOwnProperty(key)) {
+                            popupContent += `<li><strong>${key}:</strong> ${properties[key]}</li>`;
+                        }
+                    }
+
+                    popupContent += '</ul></div>';
+
+                    // 创建并显示弹出窗口
+                    new maplibregl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(popupContent)
+                        .addTo(map);
+                });
+
+                // 添加水系图层交互功能
+                map.on('click', 'water-mvt-layer', function(e) {
+                    if (!e.features || e.features.length === 0) return;
+
+                    const feature = e.features[0];
+                    const properties = feature.properties;
+
+                    // 创建弹出窗口内容
+                    let popupContent = '<div class="popup-content"><h3>水系信息</h3><ul>';
+
+                    for (const key in properties) {
+                        if (properties.hasOwnProperty(key)) {
+                            popupContent += `<li><strong>${key}:</strong> ${properties[key]}</li>`;
+                        }
+                    }
+
+                    popupContent += '</ul></div>';
+
+                    // 创建并显示弹出窗口
+                    new maplibregl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(popupContent)
+                        .addTo(map);
+                });
+
+                // 添加道路图层交互功能
+                map.on('click', 'roads-mvt-layer', function(e) {
+                    if (!e.features || e.features.length === 0) return;
+
+                    const feature = e.features[0];
+                    const properties = feature.properties;
+
+                    // 创建弹出窗口内容
+                    let popupContent = '<div class="popup-content"><h3>道路信息</h3><ul>';
+
+                    for (const key in properties) {
+                        if (properties.hasOwnProperty(key)) {
+                            popupContent += `<li><strong>${key}:</strong> ${properties[key]}</li>`;
+                        }
+                    }
+
+                    popupContent += '</ul></div>';
+
+                    // 创建并显示弹出窗口
+                    new maplibregl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(popupContent)
+                        .addTo(map);
+                });
+ // 新增：添加点状数据图层
+            map.addLayer({
+                id: 'places-mvt-layer',
+                type: 'circle',
+                source: 'places-mvt',
+                'source-layer': 'places',
+                paint: {
+                    'circle-radius': 6,
+                    'circle-color': '#e91e63',
+                    'circle-opacity': 0.9,
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff',
+                    'circle-stroke-opacity': 0.8
+                }
+            }, 'railways-mvt-layer');
+    // 新增：点状数据透明度滑块
+        document.getElementById('places-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('places-opacity-value').textContent = value;
+            if (map.getLayer('places-mvt-layer')) {
+                map.setPaintProperty('places-mvt-layer', 'circle-opacity', parseFloat(value));
+            }
+        });
+
+
+        // 缩放控制// 缓冲区分析相关变量
+let selectedPoint = null;
+let bufferLayer = null;
+
+// 点数据点击事件 - 选择点要素
+map.on('click', 'places-mvt-layer', function(e) {
+    if (!e.features || e.features.length === 0) return;
+
+    // 清除之前的选择
+    if (map.getLayer('selected-point-layer')) {
+        map.removeLayer('selected-point-layer');
+        map.removeSource('selected-point-source');
+    }
+
+    // 获取点击的点要素
+    const feature = e.features[0];
+    selectedPoint = feature;
+
+    // 高亮显示选中的点
+    map.addSource('selected-point-source', {
+        type: 'geojson',
+        data: {
+            type: 'FeatureCollection',
+            features: [feature]
+        }
+    });
+
+    map.addLayer({
+        id: 'selected-point-layer',
+        type: 'circle',
+        source: 'selected-point-source',
+        paint: {
+            'circle-radius': 10,
+            'circle-color': '#ff0000',
+            'circle-opacity': 0.8,
+            'circle-stroke-width': 3,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-opacity': 1
+        }
+    });
+
+    // 更新缓冲区分析提示
+    document.getElementById('buffer-results').innerHTML =
+        '<p>已选择点要素，输入半径后点击"创建缓冲区"</p>';
+});
+
+// 创建缓冲区功能
+document.getElementById('create-buffer').addEventListener('click', function() {
+    if (!selectedPoint) {
+        alert('请先点击选择一个点要素！');
+        return;
+    }
+
+    const radiusInput = document.getElementById('buffer-radius');
+    const radius = parseFloat(radiusInput.value);
+
+    if (isNaN(radius) || radius < 100 || radius > 10000) {
+        alert('请输入有效的半径值（100-10000米）！');
+        return;
+    }
+
+    // 清除之前的缓冲区
+    if (bufferLayer) {
+        if (map.getLayer(bufferLayer)) map.removeLayer(bufferLayer);
+        if (map.getSource('buffer-source')) map.removeSource('buffer-source');
+    }
+
+    // 使用Turf.js创建缓冲区
+    const buffer = turf.buffer(selectedPoint, radius / 1000, {units: 'kilometers'});
+
+    // 添加缓冲区源和图层
+    map.addSource('buffer-source', {
+        type: 'geojson',
+        data: buffer
+    });
+
+    bufferLayer = 'buffer-layer-' + Date.now();
+
+    map.addLayer({
+        id: bufferLayer,
+        type: 'fill',
+        source: 'buffer-source',
+        paint: {
+            'fill-color': '#007cbf',
+            'fill-opacity': 0.3,
+            'fill-outline-color': '#007cbf'
+        }
+    });
+
+    // 统计缓冲区内的要素
+    const roadsInBuffer = map.queryRenderedFeatures({
+        layers: ['roads-mvt-layer'],
+        filter: ['within', buffer]
+    });
+
+    const waterInBuffer = map.queryRenderedFeatures({
+        layers: ['water-mvt-layer'],
+        filter: ['within', buffer]
+    });
+
+    const placesInBuffer = map.queryRenderedFeatures({
+        layers: ['places-mvt-layer'],
+        filter: ['within', buffer]
+    });
+
+    // 显示统计结果
+    document.getElementById('buffer-results').innerHTML = `
+        <p>缓冲区分析结果（半径: ${radius}米）:</p>
+        <table class="buffer-table">
+            <tr>
+                <th>要素类型</th>
+                <th>数量</th>
+            </tr>
+            <tr>
+                <td>道路</td>
+                <td>${roadsInBuffer.length}</td>
+            </tr>
+            <tr>
+                <td>水系</td>
+                <td>${waterInBuffer.length}</td>
+            </tr>
+            <tr>
+                <td>点状要素</td>
+                <td>${placesInBuffer.length}</td>
+            </tr>
+        </table>
+        <p style="margin-top: 10px; font-size: 12px; color: #666;">
+            <i class="fas fa-info-circle"></i> 缓冲区面积: ${(turf.area(buffer) / 1000000).toFixed(2)} 平方公里
+        </p>
+    `;
+});
+
+// 清除缓冲区功能
+document.getElementById('clear-buffer').addEventListener('click', function() {
+    // 清除缓冲区图层
+    if (bufferLayer) {
+        if (map.getLayer(bufferLayer)) map.removeLayer(bufferLayer);
+        if (map.getSource('buffer-source')) map.removeSource('buffer-source');
+        bufferLayer = null;
+    }
+
+    // 清除选中的点
+    if (selectedPoint) {
+        if (map.getLayer('selected-point-layer')) map.removeLayer('selected-point-layer');
+        if (map.getSource('selected-point-source')) map.removeSource('selected-point-source');
+        selectedPoint = null;
+    }
+
+    document.getElementById('buffer-results').innerHTML =
+        '<p>点击点要素后点击"创建缓冲区"按钮</p>';
+});
+        document.getElementById('zoom-level').addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            document.getElementById('zoom-level-value').textContent = value.toFixed(1);
+            map.easeTo({
+                zoom: value,
+                duration: 500
+            });
+        });
+
+        // 重置视图
+        document.getElementById('reset-view').addEventListener('click', function() {
+            map.easeTo({
+                center: [116.3974, 39.9093],
+                zoom: 10,
+                pitch: 0,
+                bearing: 0,
+                duration: 1000
+            });
+
+            // 重置所有控制项
+            document.getElementById('zoom-level').value = 10;
+            document.getElementById('zoom-level-value').textContent = '10';
+
+            // 添加动画效果
+            this.innerHTML = '<i class="fas fa-home fa-spin"></i> 重置中...';
+            setTimeout(() => {
+                this.innerHTML = '<i class="fas fa-home"></i> 重置视图';
+            }, 1000);
+        });
+
+
+        // 导出地图功能
+        document.getElementById('export-map').addEventListener('click', function() {
+            // 创建临时canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = map.getCanvas().width;
+            canvas.height = map.getCanvas().height;
+
+            // 绘制地图到canvas
+            ctx.drawImage(map.getCanvas(), 0, 0);
+
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.download = 'map-export.png';
+            link.href = canvas.toDataURL();
+            link.click();
+
+            // 添加动画效果
+            this.innerHTML = '<i class="fas fa-download fa-spin"></i> 导出中...';
+            setTimeout(() => {
+                this.innerHTML = '<i class="fas fa-download"></i> 导出图片';
+            }, 800);
+        });
+
+        // 初始化应用
+            // 隐藏加载指示器
+            setTimeout(() => {
+                loadingIndicator.style.display = 'none';
+            }, 1500);
+
+            // 更新要素计数
+            document.getElementById('feature-count').textContent = 'MVT瓦片';
+
+            // 添加面图层交互功能
+            map.on('click', 'polygon-mvt-layer', function(e) {
+                if (!e.features || e.features.length === 0) return;
+
+                const feature = e.features[0];
+                const properties = feature.properties;
+
+                // 创建弹出窗口内容
+                let popupContent = '<div class="popup-content"><h3>面要素信息</h3><ul>';
+
+                for (const key in properties) {
+                    if (properties.hasOwnProperty(key)) {
+                        popupContent += `<li><strong>${key}:</strong> ${properties[key]}</li>`;
+                    }
+                }
+
+                popupContent += '</ul></div>';
+
+                // 创建并显示弹出窗口
+                new maplibregl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML(popupContent)
+                    .addTo(map);
+            });
+                // 添加铁路图层交互功能
+                map.on('click', 'railways-mvt-layer', function(e) {
+                    if (!e.features || e.features.length === 0) return;
+
+                    const feature = e.features[0];
+                    const properties = feature.properties;
+
+                    // 创建弹出窗口内容
+                    let popupContent = '<div class="popup-content"><h3>铁路信息</h3><ul>';
+
+                    for (const key in properties) {
+                        if (properties.hasOwnProperty(key)) {
+                            popupContent += `<li><strong>${key}:</strong> ${properties[key]}</li>`;
+                        }
+                    }
+
+                    popupContent += '</ul></div>';
+
+                    // 创建并显示弹出窗口
+                    new maplibregl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(popupContent)
+                        .addTo(map);
+                });
+
+                // 更改鼠标指针样式
+                map.on('mouseenter', 'polygon-mvt-layer', function() {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+
+                map.on('mouseenter', 'water-mvt-layer', function() {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+
+                map.on('mouseenter', 'roads-mvt-layer', function() {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+
+                map.on('mouseenter', 'railways-mvt-layer', function() {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+
+                map.on('mouseleave', 'polygon-mvt-layer', function() {
+                    map.getCanvas().style.cursor = '';
+                });
+
+                map.on('mouseleave', 'water-mvt-layer', function() {
+                    map.getCanvas().style.cursor = '';
+                });
+
+                map.on('mouseleave', 'roads-mvt-layer', function() {
+                    map.getCanvas().style.cursor = '';
+                });
+
+                map.on('mouseleave', 'railways-mvt-layer', function() {
+                    map.getCanvas().style.cursor = '';
+                });
+            });
+
+            // 监听地图移动事件，更新坐标
+            map.on('mousemove', function(e) {
+                document.getElementById('coordinates').textContent =
+                    `经度: ${e.lngLat.lng.toFixed(4)}, 纬度: ${e.lngLat.lat.toFixed(4)}`;
+            });
+
+            // 监听地图缩放事件，更新缩放级别显示
+            map.on('zoom', function() {
+                const zoom = map.getZoom();
+                document.getElementById('zoom-level').value = zoom;
+                document.getElementById('zoom-level-value').textContent = zoom.toFixed(1);
+            });
+
+            // 监听地图移动结束事件，更新要素计数
+            map.on('moveend', updateFeatureCount);
+        }
+
+        // 更新要素计数
+        function updateFeatureCount() {
+            if (!map.getLayer('roads-mvt-layer')) return;
+
+            const features = map.queryRenderedFeatures({layers: ['roads-mvt-layer']});
+            document.getElementById('feature-count').textContent = `当前视图道路: ${features.length} 条`;
+        }
+
+
+        // 搜索功能
+        document.getElementById('search-btn').addEventListener('click', function() {
+            const searchTerm = document.getElementById('search-input').value.trim();
+            const resultsElement = document.getElementById('search-results');
+
+            if (!searchTerm) {
+                resultsElement.innerHTML = '请输入道路ref字段进行搜索';
+                resultsElement.className = 'search-results';
+                return;
+            }
+
+            // 获取当前视图内的道路要素
+            const features = map.queryRenderedFeatures({layers: ['roads-mvt-layer']});
+
+            if (features.length === 0) {
+                resultsElement.innerHTML = '当前视图内没有道路数据';
+                resultsElement.className = 'search-results';
+                return;
+            }
+
+            // 搜索匹配的道路
+            const foundRoads = features.filter(feature => {
+                const ref = feature.properties.ref;
+                return ref && ref.toString().toLowerCase().includes(searchTerm.toLowerCase());
+            });
+
+            if (foundRoads.length > 0) {
+                resultsElement.innerHTML = `找到 ${foundRoads.length} 条匹配道路: ` +
+                    foundRoads.map(road => `${road.properties.ref || '未知'} (${road.properties.name || '未命名'})`).join(', ');
+                resultsElement.className = 'search-results highlight';
+
+                // 高亮显示匹配的道路
+                highlightSearchResults(foundRoads);
+            } else {
+                resultsElement.innerHTML = `未找到与 "${searchTerm}" 匹配的道路`;
+                resultsElement.className = 'search-results';
+            }
+        });
+
+        // 高亮搜索结果
+        function highlightSearchResults(roads) {
+            // 清除之前的高亮
+            if (currentHighlightLayer) {
+                if (map.getLayer(currentHighlightLayer)) {
+                    map.removeLayer(currentHighlightLayer);
+                }
+                if (map.getSource('search-highlight')) {
+                    map.removeSource('search-highlight');
+                }
+            }
+
+            // 创建高亮要素
+            const highlightFeatures = roads.map(road => {
+                return {
+                    type: 'Feature',
+                    properties: road.properties,
+                    geometry: road.geometry
+                };
+            });
+
+            // 添加高亮源
+            map.addSource('search-highlight', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: highlightFeatures
+                }
+            });
+
+            // 添加高亮图层
+            map.addLayer({
+                id: 'search-highlight-layer',
+                type: 'line',
+                source: 'search-highlight',
+                paint: {
+                    'line-color': '#ff0000',
+                    'line-width': 6,
+                    'line-opacity': 0.7
+                }
+            }, 'roads-mvt-layer');
+
+            currentHighlightLayer = 'search-highlight-layer';
+
+            // 更新图例
+            const legendContainer = document.getElementById('highlight-legend');
+            legendContainer.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                    <div style="width: 20px; height: 4px; background-color: #ff0000;"></div>
+                    <div>搜索结果</div>
+                </div>
+            `;
+            legendContainer.style.display = 'block';
+        }
+
+        // 清除搜索
+        document.getElementById('clear-search').addEventListener('click', function() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('search-results').innerHTML = '输入道路ref字段进行搜索';
+            document.getElementById('search-results').className = 'search-results';
+
+            // 清除高亮
+            if (currentHighlightLayer) {
+                if (map.getLayer(currentHighlightLayer)) {
+                    map.removeLayer(currentHighlightLayer);
+                }
+                if (map.getSource('search-highlight')) {
+                    map.removeSource('search-highlight');
+                }
+                currentHighlightLayer = null;
+            }
+
+            document.getElementById('highlight-legend').style.display = 'none';
+        });
+
+        // 分析类型选项卡切换
+        document.querySelectorAll('.analysis-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // 移除所有激活状态
+                document.querySelectorAll('.analysis-tab').forEach(t => {
+                    t.classList.remove('active');
+                });
+
+                // 添加当前激活状态
+                this.classList.add('active');
+
+                // 更新当前分析类型
+                currentAnalysisType = this.getAttribute('data-type');
+
+                // 更新按钮文本
+                const analyzeBtn = document.getElementById('analyze-data');
+                const typeText = this.textContent;
+                analyzeBtn.innerHTML = `<i class="fas fa-chart-pie"></i>${typeText}分析`;
+            });
+        });
+
+        // 统计分析功能
+        document.getElementById('analyze-data').addEventListener('click', function() {
+            // 获取当前视图内的所有道路要素
+            const features = map.queryRenderedFeatures({layers: ['roads-mvt-layer']});
+
+            if (features.length === 0) {
+                document.getElementById('stats-results').innerHTML =
+                    '<p>当前视图内没有道路数据，请放大或移动地图后重试</p>';
+                return;
+            }
+
+            let stats = {};
+            let chartData = [];
+            let colors = [];
+            let labels = [];
+
+            // 根据当前分析类型进行统计
+            switch (currentAnalysisType) {
+                case 'oneway':
+                    // 单行道统计
+                    stats = {
+                        'B': 0, // 单行道
+                        'F': 0, // 非单行道
+                        'unknown': 0, // 未知类型
+                        'total': features.length
+                    };
+
+                    features.forEach(feature => {
+                        const oneway = feature.properties.oneway;
+                        if (oneway === 'B') {
+                            stats.B++;
+                        } else if (oneway === 'F') {
+                            stats.F++;
+                        } else {
+                            stats.unknown++;
+                        }
+                    });
+
+                    chartData = [
+                        {value: stats.B, name: '单行道(B)'},
+                        {value: stats.F, name: '非单行道(F)'},
+                        {value: stats.unknown, name: '未知类型'}
+                    ];
+                    colors = ['#ffeb3b', '#4caf50', '#9e9e9e'];
+                    labels = ['单行道(B)', '非单行道(F)', '未知类型'];
+                    break;
+
+                case 'bridge':
+                    // 桥梁统计
+                    stats = {
+                        'T': 0, // 桥梁
+                        'F': 0, // 非桥梁
+                        'unknown': 0, // 未知类型
+                        'total': features.length
+                    };
+
+                    features.forEach(feature => {
+                        const bridge = feature.properties.bridge;
+                        if (bridge === 'T') {
+                            stats.T++;
+                        } else if (bridge === 'F') {
+                            stats.F++;
+                        } else {
+                            stats.unknown++;
+                        }
+                    });
+
+                    chartData = [
+                        {value: stats.T, name: '桥梁(T)'},
+                        {value: stats.F, name: '非桥梁(F)'},
+                        {value: stats.unknown, name: '未知类型'}
+                    ];
+                    colors = ['#ff9800', '#2196f3', '#9e9e9e'];
+                    labels = ['桥梁(T)', '非桥梁(F)', '未知类型'];
+                    break;
+
+                case 'tunnel':
+                    // 隧道统计
+                    stats = {
+                        'T': 0, // 隧道
+                        'F': 0, // 非隧道
+                        'unknown': 0, // 未知类型
+                        'total': features.length
+                    };
+
+                    features.forEach(feature => {
+                        const tunnel = feature.properties.tunnel;
+                        if (tunnel === 'T') {
+                            stats.T++;
+                        } else if (tunnel === 'F') {
+                            stats.F++;
+                        } else {
+                            stats.unknown++;
+                        }
+                    });
+
+                    chartData = [
+                        {value: stats.T, name: '隧道(T)'},
+                        {value: stats.F, name: '非隧道(F)'},
+                        {value: stats.unknown, name: '未知类型'}
+                    ];
+                    colors = ['#9c27b0', '#00bcd4', '#9e9e9e'];
+                    labels = ['隧道(T)', '非隧道(F)', '未知类型'];
+                    break;
+            }
+
+            // 清除之前的高亮图层
+            clearHighlightLayers();
+
+            // 更新统计结果文本
+            const statsElement = document.getElementById('stats-results');
+            let typeName = '';
+            let fieldName = '';
+
+            switch (currentAnalysisType) {
+                case 'oneway':
+                    typeName = '单行道';
+                    fieldName = 'oneway';
+                    break;
+                case 'bridge':
+                    typeName = '桥梁';
+                    fieldName = 'bridge';
+                    break;
+                case 'tunnel':
+                    typeName = '隧道';
+                    fieldName = 'tunnel';
+                    break;
+            }
+
+            statsElement.innerHTML = `
+                <p>当前视图内道路${typeName}统计结果:</p>
+                <table class="stats-table">
+                    <tr>
+                        <th>类型</th>
+                        <th>数量</th>
+                        <th>占比</th>
+                    </tr>
+                    <tr>
+                        <td>${labels[0]}</td>
+                        <td>${chartData[0].value}</td>
+                        <td>${((chartData[0].value / stats.total) * 100).toFixed(2)}%</td>
+                    </tr>
+                    <tr>
+                        <td>${labels[1]}</td>
+                        <td>${chartData[1].value}</td>
+                        <td>${((chartData[1].value / stats.total) * 100).toFixed(2)}%</td>
+                    </tr>
+                    <tr>
+                        <td>${labels[2]}</td>
+                        <td>${chartData[2].value}</td>
+                        <td>${((chartData[2].value / stats.total) * 100).toFixed(2)}%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>总计</strong></td>
+                        <td><strong>${stats.total}</strong></td>
+                        <td><strong>100%</strong></td>
+                    </tr>
+                </table>
+                <p style="color: #666; margin-top: 10px; font-size: 12px;">
+                    <i class="fas fa-mouse-pointer"></i> 点击图表可高亮显示对应类型的道路
+                </p>
+            `;
+
+            // 显示图表容器
+            const chartContainer = document.getElementById('chart-container');
+            chartContainer.style.display = 'block';
+
+            // 初始化 ECharts图表
+            if (chart) {
+                chart.dispose();
+            }
+            chart = echarts.init(chartContainer);
+
+            // 配置图表选项
+            const option = {
+                title: {
+                    text: `道路${typeName}统计`,
+                    left: 'center',
+                    textStyle: {
+                        fontSize: 16,
+                        fontWeight: 'bold'
+                    }
+                },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{a}<br/>{b}: {c} ({d}%)'
+                },
+                legend: {
+                    orient: 'vertical',
+                    left: 'left',
+                    data: labels
+                },
+                series: [{
+                    name: typeName + '类型',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 10,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: false,
+                        position: 'center'
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            fontSize: '18',
+                            fontWeight: 'bold'
+                        },
+                        labelLine: {
+                            show: false
+                        }
+                    },
+                    data: chartData.map((item, index) => ({
+                        value: item.value,
+                        name: item.name,
+                        itemStyle: {color: colors[index]}
+                    }))
+                }]
+            };
+
+            chart.setOption(option);
+
+            // 添加图表点击事件
+            chart.on('click', (params) => {
+                const name = params.name;
+                let filterValue = '';
+
+                // 根据点击的图表项确定过滤值
+                if (name.includes('(B)') || name.includes('(T)') || name.includes('(F)')) {
+                    filterValue = name.slice(-2, -1); // 获取括号内的字符
+                }
+
+                // 高亮对应类型的道路
+                highlightRoadsByType(currentAnalysisType, filterValue, colors[labels.indexOf(name)], name);
+            });
+
+            // 添加动画效果
+            this.innerHTML = '<i class="fas fa-chart-pie fa-spin"></i> 分析中...';
+            setTimeout(() => {
+                const typeText = document.querySelector('.analysis-tab.active').textContent;
+                this.innerHTML = `<i class="fas fa-chart-pie"></i>${typeText}分析`;
+            }, 800);
+        });
+
+        // 高亮特定类型的道路
+        function highlightRoadsByType(type, value, color, label) {
+            // 清除之前的高亮
+            clearHighlightLayers();
+
+            // 确保地图已加载
+            if (!map.getSource('roads-mvt')) {
+                console.error('道路数据源未加载');
+                return;
+            }
+
+            // 添加新的高亮图层
+            const layerId = `${type}-${value}-highlight-layer`;
+
+            // 检查图层是否已存在
+            if (map.getLayer(layerId)) {
+                map.removeLayer(layerId);
+            }
+
+            // 添加高亮图层
+            map.addLayer({
+                id: layerId,
+                type: 'line',
+                source: 'roads-mvt',
+                'source-layer': 'roads',
+                filter: ['==', ['get', type], value],
+                paint: {
+                    'line-color': color,
+                    'line-width': 6,
+                    'line-opacity': 0.8
+                }
+            }, 'roads-mvt-layer');
+
+            // 更新状态提示
+            const statsElement = document.getElementById('stats-results');
+            const existingNote = statsElement.querySelector('.highlight-note');
+            if (existingNote) {
+                existingNote.remove();
+            }
+
+            const note = document.createElement('p');
+            note.className = 'highlight-note';
+            note.innerHTML = `<span style="color: ${color}; font-weight: bold;"><i class="fas fa-info-circle"></i> ${label}已高亮显示</span>`;
+            note.style.marginTop = '10px';
+            note.style.padding = '8px';
+            note.style.backgroundColor = '#f8f9fa';
+            note.style.borderRadius = '4px';
+            note.style.borderLeft = `4px solid ${color}`;
+            statsElement.appendChild(note);
+
+            // 添加悬停效果到图例项
+            const legendItems = document.querySelectorAll('#highlight-legend .legend-item');
+            legendItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('data-type') === type) {
+                    item.classList.add('active');
+                }
+            });
+
+            currentHighlightLayer = layerId;
+        }
+
+        // 清除高亮图层
+        function clearHighlightLayers() {
+            // 移除所有高亮图层
+            const highlightLayers = [
+                'oneway-B-highlight-layer', 'oneway-F-highlight-layer',
+                'bridge-T-highlight-layer', 'bridge-F-highlight-layer',
+                'tunnel-T-highlight-layer', 'tunnel-F-highlight-layer',
+                'search-highlight-layer'
+            ];
+
+            highlightLayers.forEach(layerId => {
+                if (map.getLayer(layerId)) {
+                    map.removeLayer(layerId);
+                }
+            });
+
+            // 清除高亮源
+            if (map.getSource('search-highlight')) {
+                map.removeSource('search-highlight');
+            }
+
+            // 清除状态提示
+            const statsElement = document.getElementById('stats-results');
+            const existingNote = statsElement.querySelector('.highlight-note');
+            if (existingNote) {
+                existingNote.remove();
+            }
+
+            // 清除图例项的激活状态
+            const legendItems = document.querySelectorAll('#highlight-legend .legend-item');
+            legendItems.forEach(item => {
+                item.classList.remove('active');
+            });
+
+            currentHighlightLayer = null;
+        }
+
+        // 重置统计功能
+        document.getElementById('reset-stats').addEventListener('click', function() {
+            // 重置统计结果文本
+            document.getElementById('stats-results').innerHTML =
+                '<p>选择分析类型后点击"统计分析"按钮分析当前视图内的道路数据</p>';
+
+            // 隐藏图表容器
+            document.getElementById('chart-container').style.display = 'none';
+
+            // 清除高亮图层
+            clearHighlightLayers();
+
+            // 重置图例
+            document.getElementById('highlight-legend').innerHTML = '';
+            document.getElementById('highlight-legend').style.display = 'none';
+
+            // 销毁ECharts实例
+            if (chart) {
+                chart.dispose();
+                chart = null;
+            }
+
+            // 添加动画效果
+            this.innerHTML = '<i class="fas fa-redo fa-spin"></i> 重置中...';
+            setTimeout(() => {
+                this.innerHTML = '<i class="fas fa-redo"></i> 重置统计';
+            }, 800);
+        });
+
+        // 图层控制功能
+        document.getElementById('toggle-layer').addEventListener('change', function() {
+            const visibility = this.checked ? 'visible' : 'none';
+            if (map.getLayer('polygon-mvt-layer')) {
+                map.setLayoutProperty('polygon-mvt-layer', 'visibility', visibility);
+            }
+        });
+
+        document.getElementById('toggle-water-layer').addEventListener('change', function() {
+            const visibility = this.checked ? 'visible' : 'none';
+            if (map.getLayer('water-mvt-layer')) {
+                map.setLayoutProperty('water-mvt-layer', 'visibility', visibility);
+            }
+        });
+
+        document.getElementById('toggle-roads-layer').addEventListener('change', function() {
+            const visibility = this.checked ? 'visible' : 'none';
+            if (map.getLayer('roads-mvt-layer')) {
+                map.setLayoutProperty('roads-mvt-layer', 'visibility', visibility);
+            }
+        });
+
+        document.getElementById('toggle-railways-layer').addEventListener('change', function() {
+            const visibility = this.checked ? 'visible' : 'none';
+            if (map.getLayer('railways-mvt-layer')) {
+                map.setLayoutProperty('railways-mvt-layer', 'visibility', visibility);
+            }
+        });
+
+        // 颜色选择器功能
+        document.getElementById('polygon-color').addEventListener('change', function() {
+            if (map.getLayer('polygon-mvt-layer')) {
+                map.setPaintProperty('polygon-mvt-layer', 'fill-color', this.value);
+            }
+        });
+
+        document.getElementById('water-color').addEventListener('change', function() {
+            if (map.getLayer('water-mvt-layer')) {
+                map.setPaintProperty('water-mvt-layer', 'fill-color', this.value);
+            }
+        });
+
+        document.getElementById('roads-color').addEventListener('change', function() {
+            if (map.getLayer('roads-mvt-layer')) {
+                map.setPaintProperty('roads-mvt-layer', 'line-color', this.value);
+            }
+        });
+
+        document.getElementById('railways-color').addEventListener('change', function() {
+            if (map.getLayer('railways-mvt-layer')) {
+                map.setPaintProperty('railways-mvt-layer', 'line-color', this.value);
+            }
+        });
+
+        // 透明度滑块功能
+        document.getElementById('fill-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('fill-opacity-value').textContent = value;
+            if (map.getLayer('polygon-mvt-layer')) {
+                map.setPaintProperty('polygon-mvt-layer', 'fill-opacity', parseFloat(value));
+            }
+        });
+
+        document.getElementById('water-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('water-opacity-value').textContent = value;
+            if (map.getLayer('water-mvt-layer')) {
+                map.setPaintProperty('water-mvt-layer', 'fill-opacity', parseFloat(value));
+            }
+        });
+
+        document.getElementById('roads-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('roads-opacity-value').textContent = value;
+            if (map.getLayer('roads-mvt-layer')) {
+                map.setPaintProperty('roads-mvt-layer', 'line-opacity', parseFloat(value));
+            }
+        });
+
+        document.getElementById('railways-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('railways-opacity-value').textContent = value;
+            if (map.getLayer('railways-mvt-layer')) {
+                map.setPaintProperty('railways-mvt-layer', 'line-opacity', parseFloat(value));
+            }
+        });
+
+         // 新增：点状数据图层控制
+        document.getElementById('toggle-places-layer').addEventListener('change', function() {
+            const visibility = this.checked ? 'visible' : 'none';
+            if (map.getLayer('places-mvt-layer')) {
+                map.setLayoutProperty('places-mvt-layer', 'visibility', visibility);
+            }
+        });
+
+        // 颜色选择器功能
+        document.getElementById('polygon-color').addEventListener('change', function() {
+            if (map.getLayer('polygon-mvt-layer')) {
+                map.setPaintProperty('polygon-mvt-layer', 'fill-color', this.value);
+            }
+        });
+
+        document.getElementById('water-color').addEventListener('change', function() {
+            if (map.getLayer('water-mvt-layer')) {
+                map.setPaintProperty('water-mvt-layer', 'fill-color', this.value);
+            }
+        });
+
+        document.getElementById('roads-color').addEventListener('change', function() {
+            if (map.getLayer('roads-mvt-layer')) {
+                map.setPaintProperty('roads-mvt-layer', 'line-color', this.value);
+            }
+        });
+
+        document.getElementById('railways-color').addEventListener('change', function() {
+            if (map.getLayer('railways-mvt-layer')) {
+                map.setPaintProperty('railways-mvt-layer', 'line-color', this.value);
+            }
+        });
+        // 新增：点状数据颜色选择器
+        document.getElementById('places-color').addEventListener('change', function() {
+            if (map.getLayer('places-mvt-layer')) {
+                map.setPaintProperty('places-mvt-layer', 'circle-color', this.value);
+            }
+        });
+
+        // 透明度滑块功能
+        document.getElementById('fill-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('fill-opacity-value').textContent = value;
+            if (map.getLayer('polygon-mvt-layer')) {
+                map.setPaintProperty('polygon-mvt-layer', 'fill-opacity', parseFloat(value));
+            }
+        });
+
+        document.getElementById('water-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('water-opacity-value').textContent = value;
+            if (map.getLayer('water-mvt-layer')) {
+                map.setPaintProperty('water-mvt-layer', 'fill-opacity', parseFloat(value));
+            }
+        });
+
+        document.getElementById('roads-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('roads-opacity-value').textContent = value;
+            if (map.getLayer('roads-mvt-layer')) {
+                map.setPaintProperty('roads-mvt-layer', 'line-opacity', parseFloat(value));
+            }
+        });
+
+        document.getElementById('railways-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('railways-opacity-value').textContent = value;
+            if (map.getLayer('railways-mvt-layer')) {
+                map.setPaintProperty('railways-mvt-layer', 'line-opacity', parseFloat(value));
+            }
+        });
+
+        // 新增：点状数据透明度滑块
+        document.getElementById('places-opacity').addEventListener('input', function() {
+            const value = this.value;
+            document.getElementById('places-opacity-value').textContent = value;
+            if (map.getLayer('places-mvt-layer')) {
+                map.setPaintProperty('places-mvt-layer', 'circle-opacity', parseFloat(value));
+            }
+        });
+
+
+        // 缩放控制
+        document.getElementById('zoom-level').addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            document.getElementById('zoom-level-value').textContent = value.toFixed(1);
+            map.easeTo({
+                zoom: value,
+                duration: 500
+            });
+        });
+
+        // 重置视图
+        document.getElementById('reset-view').addEventListener('click', function() {
+            map.easeTo({
+                center: [116.3974, 39.9093],
+                zoom: 10,
+                pitch: 0,
+                bearing: 0,
+                duration: 1000
+            });
+
+            // 重置所有控制项
+            document.getElementById('zoom-level').value = 10;
+            document.getElementById('zoom-level-value').textContent = '10';
+
+            // 添加动画效果
+            this.innerHTML = '<i class="fas fa-home fa-spin"></i> 重置中...';
+            setTimeout(() => {
+                this.innerHTML = '<i class="fas fa-home"></i> 重置视图';
+            }, 1000);
+        });
+
+
+        // 导出地图功能
+        document.getElementById('export-map').addEventListener('click', function() {
+            // 创建临时canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = map.getCanvas().width;
+            canvas.height = map.getCanvas().height;
+
+            // 绘制地图到canvas
+            ctx.drawImage(map.getCanvas(), 0, 0);
+
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.download = 'map-export.png';
+            link.href = canvas.toDataURL();
+            link.click();
+
+            // 添加动画效果
+            this.innerHTML = '<i class="fas fa-download fa-spin"></i> 导出中...';
+            setTimeout(() => {
+                this.innerHTML = '<i class="fas fa-download"></i> 导出图片';
+            }, 800);
+        });
+
+        // 初始化应用
+        window.addEventListener('load', function() {
+            initMap();
+        });
+
+        // 添加CSS样式
+        if (!document.querySelector('#oneway-highlight-styles')) {
+            const style = document.createElement('style');
+            style.id = 'oneway-highlight-styles';
+            style.textContent = `
+                .legend-item:hover {
+                    background-color: #f0f0f0 !important;
+                }
+
+                .legend-item.active {
+                    background-color: #e3f2fd !important;
+                    border-left: 3px solid #2196f3;
+                }
+
+                .highlight-note {
+                    font-size: 14px;
+                    padding: 8px;
+                    background-color: #f8f9fa;
+                    border-radius: 4px;
+                    border-left: 4px solid #007bff;
+                }
+                .buffer-analysis-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.buffer-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.buffer-header h3 {
+    font-size: 1.1rem;
+    color: #1a2a6c;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.buffer-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.buffer-input-group {
+    display: flex;
+    gap: 8px;
+}
+
+.buffer-input {
+    flex: 1;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.buffer-input:focus {
+    border-color: #3498db;
+}
+
+.buffer-btn {
+    background: linear-gradient(to right, #3498db, #2980b9);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.buffer-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.buffer-btn.secondary {
+    background: linear-gradient(to right, #f39c12, #e67e22);
+    color: #333;
+}
+
+.buffer-results {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #555;
+    background: white;
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 60px;
+}
+
+.buffer-results p {
+    margin: 0;
+    color: #666;
+}
+
+.buffer-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.8rem;
+}
+
+.buffer-table th, .buffer-table td {
+    padding: 6px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.buffer-table th {
+    background-color: #f8f9fa;
+    color: #1a2a6c;
+    font-weight: 600;
+}
+
+.buffer-table tr:hover {
+    background-color: #f5f5f5;
+}
+            `;
+            document.head.appendChild(style);
+        }
+
+    </script>
+</body>
+</html>
